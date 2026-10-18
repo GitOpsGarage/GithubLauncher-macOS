@@ -7,6 +7,8 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../lib/GitHubLauncher.Core/GitHubLauncher.Core.csproj" />
+    <Compile Include="../Services/CommunityCatalog.cs" Link="CommunityCatalog.cs" />
+    <Compile Include="../Services/CatalogPresentation.cs" Link="CatalogPresentation.cs" />
     <Compile Include="../Services/GameDataRequirements.cs" Link="GameDataRequirements.cs" />
     <Compile Include="../Services/MacCompatibility.cs" Link="MacCompatibility.cs" />
     <Compile Include="../Services/LauncherPaths.cs" Link="LauncherPaths.cs" />

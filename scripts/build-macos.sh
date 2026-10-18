@@ -20,7 +20,10 @@ for task_size in 16 32 128 256 512; do
     task_retina_size=$((task_size * 2))
     sips -z "$task_retina_size" "$task_retina_size" Assets/app.png --out "$task_iconset/icon_${task_size}x${task_size}@2x.png" >/dev/null
 done
-iconutil -c icns "$task_iconset" -o "$task_bundle/Contents/Resources/GithubLauncher.icns"
+# A distinct resource name prevents Finder/Dock from reusing an older icon.
+task_icon_digest="$(shasum -a 256 Assets/app.png)"
+task_icon_name="GithubLauncher-${task_icon_digest:0:12}.icns"
+iconutil -c icns "$task_iconset" -o "$task_bundle/Contents/Resources/$task_icon_name"
 rm -rf "$task_iconset"
 task_sdl="${SDL2_LIBRARY:-/opt/homebrew/lib/libSDL2.dylib}"
 task_arch="${task_rid#osx-}"
@@ -50,4 +53,5 @@ cat > "$task_bundle/Contents/Info.plist" <<'PLIST'
 <key>NSHighResolutionCapable</key><true/>
 </dict></plist>
 PLIST
+/usr/libexec/PlistBuddy -c "Set :CFBundleIconFile $task_icon_name" "$task_bundle/Contents/Info.plist"
 echo "Built: $task_bundle"

@@ -43,7 +43,7 @@ namespace GithubLauncher.Models
         public bool IsCustom { get; set; }
         public string CrossOverBottle { get; set; } = string.Empty;
         public bool AllowCrossOverTesting { get; set; }
-        public string MacWindowsRunner { get; set; } = "notproton";
+        public string MacWindowsRunner { get; set; } = "crossover";
         public string SteamAccount { get; set; } = "";
         public string SteamTool { get; set; } = "";
         public ulong SteamShortcutId { get; set; }

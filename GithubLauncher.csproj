@@ -39,6 +39,7 @@
 
 	<ItemGroup>
 		<None Update="mac-compatibility.json" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+		<None Update="quiver-catalog.json" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
 		<None Update="catalog.json" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
 		<Compile Remove="tests/**/*.cs" />
 		<AvaloniaResource Include="Assets/**" />

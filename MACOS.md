@@ -156,3 +156,19 @@ The build script bundles a matching Homebrew SDL2 library when available (overri
 input is unavailable. Selecting an executable is saved by the existing launcher UI.
 Gameplay validation with the user’s original game data remains necessary; automated
 checks exercise launcher behavior and fixture files, not actual games.
+
+## Choosing a Windows launch method
+
+New games use direct CrossOver by default. Create a suitable bottle in CrossOver,
+then select it in Configure Mac launch. The launcher keeps downloaded game payloads
+in its game folder and invokes the selected bottle's runtime; it does not copy every
+game into the bottle's drive C. Dependencies may still need installation in that
+bottle. Existing per-game runner settings are preserved.
+
+Steam / NotProton remains available per game when Steam library integration is
+wanted. NotProton also uses CrossOver: it adds Steam Play integration and requires
+matching supported Steam and CrossOver versions, a configured NotProton tool, and a
+prepared shortcut. It is not a separate compatibility engine. Consult the
+[official NotProton requirements](https://github.com/NotProtonNot/NotProton).
+Direct launch is the simpler default for standalone ports; neither path is assumed
+to improve performance or compatibility without a gameplay test of that game/build.

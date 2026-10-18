@@ -39,6 +39,7 @@ namespace GithubLauncher
         public MacCatalogFilter CatalogFilter { get; set; } = MacCatalogFilter.All;
         public bool EnableLauncherSelfUpdates { get; set; } = !OperatingSystem.IsMacOS();
         public string AppListRepository { get; set; } = "SirDiabo/GHLAppList";
+        public bool EnableCommunityCatalog { get; set; } = true;
         public string AppListCachedVersion { get; set; } = string.Empty;
         private static readonly string SettingsPath = Path.Combine(
             LauncherPaths.DataDirectory,

@@ -8,7 +8,7 @@ DOTNET_BIN="${DOTNET_BIN:-dotnet}"
 python3 - <<'PY'
 import json
 from pathlib import Path
-for name in ('catalog.json', 'mac-compatibility.json'):
+for name in ('catalog.json', 'quiver-catalog.json', 'mac-compatibility.json'):
     json.loads(Path(name).read_text())
 print('Catalog JSON valid.')
 PY

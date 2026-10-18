@@ -1,6 +1,15 @@
 using GithubLauncher.Services;
 using GitHubLauncher.Core.Models;
 
+if (args is ["--refresh-community-catalog", var outputDirectory])
+{
+    var result = await CommunityCatalog.LoadAsync(outputDirectory, true);
+    Console.WriteLine(result.Status);
+    if (!result.Status.Contains("updated")) throw new Exception("Live catalog refresh failed.");
+    return;
+}
+await CommunityCatalogTests.RunAsync();
+
 int checks = 0;
 void Check(bool condition, string message)
 {

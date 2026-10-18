@@ -827,7 +827,7 @@
 
 				<!-- Logo/Header -->
 				<StackPanel Grid.Row="0" Margin="20">
-					<Image anim:ImageBehavior.AnimatedSource="avares://GithubLauncher/Assets/app.gif"
+					<Image Source="avares://GithubLauncher/Assets/app.png"
 											Width="90"
 											Height="90"
 											HorizontalAlignment="Center"
@@ -1732,6 +1732,13 @@
 
 										<Border Height="1" Background="{DynamicResource ThemeBorder}" Margin="0,8,0,8"/>
 
+                                        <CheckBox x:Name="EnableCommunityCatalogCheckBox"
+                                                  Content="Include Quiver community catalog"
+                                                  IsCheckedChanged="EnableCommunityCatalog_Changed"/>
+                                        <TextBlock Text="Adds projects from quiverlauncher.com alongside your current catalog. Listings do not confirm Mac compatibility. Changes apply when reopening the catalog."
+                                                   FontSize="11" TextWrapping="Wrap"
+                                                   Foreground="{DynamicResource ThemeTextSecondary}"/>
+
 										<!-- GitHub API Token -->
 										<TextBlock Text="GITHUB API TOKEN"
 												   FontSize="10" FontWeight="Bold"
@@ -2050,7 +2057,7 @@
 							</ScrollViewer>
 
 							<!-- App Browser Tab -->
-							<ScrollViewer x:Name="AppBrowserTab" VerticalScrollBarVisibility="Auto" Margin="40" IsVisible="False">
+							<ScrollViewer x:Name="AppBrowserTab" ScrollChanged="Catalog_ScrollChanged" VerticalScrollBarVisibility="Auto" Margin="40" IsVisible="False">
 								<StackPanel Spacing="20">
 
 									<Border Background="{DynamicResource ThemeDarker}"
@@ -2065,8 +2072,8 @@
 													<ColumnDefinition Width="Auto"/>
 												</Grid.ColumnDefinitions>
 												<StackPanel Grid.Column="0" Spacing="2">
-													<TextBlock Text="APP CATALOG"
-															   FontSize="16"
+													<TextBlock Text="DISCOVER GAMES"
+															   FontSize="18"
 															   FontWeight="Bold"
 															   Foreground="{DynamicResource ThemeText}"
 															   VerticalAlignment="Center"/>
@@ -2082,29 +2089,71 @@
 														Click="RefreshAppCatalog_Click"/>
 											</Grid>
 											<Border Height="1" Background="{DynamicResource ThemeBorder}" Margin="0,4,0,4"/>
-                                            <StackPanel IsVisible="{Binding IsMacPlatform}" Spacing="8" Margin="0,8,0,4">
-                                                <TextBlock Text="Browse games" FontSize="12" FontWeight="SemiBold"
-                                                           Foreground="{DynamicResource ThemeTextSecondary}"/>
-                                                <ComboBox SelectedIndex="{Binding MacCatalogFilterIndex, Mode=TwoWay}"
-                                                          HorizontalAlignment="Left" MinWidth="340"
-                                                          AutomationProperties.Name="Game compatibility filter">
-                                                    <ComboBoxItem Content="All games"/>
-                                                    <ComboBoxItem Content="Native Mac builds"/>
-                                                    <ComboBoxItem Content="Windows — confirmed playable on Mac"/>
-                                                    <ComboBoxItem Content="Other games — try on this Mac"/>
-                                                </ComboBox>
-                                                <TextBlock Text="{Binding MacCatalogFilterDescription}" FontSize="12"
-                                                           TextWrapping="Wrap"
-                                                           Foreground="{DynamicResource ThemeTextSecondary}"/>
-                                            </StackPanel>
+                                            <TextBlock Text="Browse ports, recompilations and recreations. Find a game, check its platforms, then add it to your library."
+                                                       FontSize="12" TextWrapping="Wrap" Foreground="{DynamicResource ThemeTextSecondary}"/>
+                                            <TextBox x:Name="CatalogSearchBox" Watermark="Search games, projects or repositories…"
+                                                     TextChanged="CatalogSearch_TextChanged"
+                                                     AutomationProperties.Name="Search catalog"/>
+                                            <WrapPanel>
+                                                <StackPanel Spacing="4" Margin="0,0,16,8">
+                                                    <TextBlock Text="Platforms" FontSize="11" Foreground="{DynamicResource ThemeTextSecondary}"/>
+                                                    <Button x:Name="CatalogPlatformButton" Content="Platforms · 4 selected ▾" MinWidth="210"
+                                                            AutomationProperties.Name="Filter catalog platforms">
+                                                        <Button.Flyout>
+                                                            <Flyout Placement="BottomEdgeAlignedLeft">
+                                                                <StackPanel Spacing="4" MinWidth="200">
+                                                                    <TextBlock Text="Show platforms" FontWeight="SemiBold" Margin="0,0,0,6"/>
+                                                                    <CheckBox Content="macOS" Tag="macos" IsChecked="True"
+                                                                              IsCheckedChanged="CatalogPlatform_CheckedChanged"/>
+                                                                    <CheckBox Content="Windows" Tag="windows" IsChecked="True"
+                                                                              IsCheckedChanged="CatalogPlatform_CheckedChanged"/>
+                                                                    <CheckBox Content="Linux" Tag="linux" IsChecked="True"
+                                                                              IsCheckedChanged="CatalogPlatform_CheckedChanged"/>
+                                                                    <CheckBox Content="Android" Tag="android" IsChecked="False"
+                                                                              IsCheckedChanged="CatalogPlatform_CheckedChanged"/>
+                                                                    <CheckBox Content="iOS" Tag="ios" IsChecked="False"
+                                                                              IsCheckedChanged="CatalogPlatform_CheckedChanged"/>
+                                                                    <CheckBox Content="Not listed" Tag="unknown" IsChecked="True"
+                                                                              IsCheckedChanged="CatalogPlatform_CheckedChanged"/>
+                                                                    <TextBlock Text="Match any checked platform" FontSize="11" Margin="0,6,0,0"
+                                                                               Foreground="{DynamicResource ThemeTextSecondary}"/>
+                                                                </StackPanel>
+                                                            </Flyout>
+                                                        </Button.Flyout>
+                                                    </Button>
+                                                </StackPanel>
+                                                <StackPanel Spacing="4" Margin="0,0,0,8">
+                                                    <TextBlock Text="Sort" FontSize="11" Foreground="{DynamicResource ThemeTextSecondary}"/>
+                                                    <ComboBox x:Name="CatalogSortOrder" SelectedIndex="0" MinWidth="170"
+                                                              SelectionChanged="CatalogFilter_SelectionChanged"
+                                                              AutomationProperties.Name="Catalog sort order">
+                                                        <ComboBoxItem Content="Name: A–Z"/>
+                                                        <ComboBoxItem Content="Name: Z–A"/>
+                                                    </ComboBox>
+                                                </StackPanel>
+                                                <StackPanel IsVisible="{Binding IsMacPlatform}" Spacing="4" Margin="16,0,0,8">
+                                                    <TextBlock Text="Mac compatibility" FontSize="11" Foreground="{DynamicResource ThemeTextSecondary}"/>
+                                                    <ComboBox SelectedIndex="{Binding MacCatalogFilterIndex, Mode=TwoWay}"
+                                                              MinWidth="210" ToolTip.Tip="{Binding MacCatalogFilterDescription}"
+                                                              AutomationProperties.Name="Game compatibility filter">
+                                                        <ComboBoxItem Content="All Mac results"/>
+                                                        <ComboBoxItem Content="Native Mac builds"/>
+                                                        <ComboBoxItem Content="Windows — playable on Mac"/>
+                                                        <ComboBoxItem Content="Untested / unknown"/>
+                                                    </ComboBox>
+                                                </StackPanel>
+                                            </WrapPanel>
+                                            <TextBlock Text="Platforms are listed by the project catalog or recorded releases. Mac gameplay reports are shown separately."
+                                                       FontSize="11" TextWrapping="Wrap" Foreground="{DynamicResource ThemeTextSecondary}"/>
+
 											<TextBlock x:Name="AppCatalogStatusText"
 													   Text="Loading catalog..."
 													   FontSize="12"
 													   Foreground="{DynamicResource ThemeTextSecondary}"
 													   IsVisible="True"/>
-											<StackPanel x:Name="AppCatalogContent" Spacing="16" IsVisible="False"/>
 										</StackPanel>
 									</Border>
+                                    <StackPanel x:Name="AppCatalogContent" Spacing="16" IsVisible="False"/>
 
 								</StackPanel>
 							</ScrollViewer>

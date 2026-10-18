@@ -15,7 +15,8 @@ The original MIT license and project attribution are preserved.
   Windows confirmation requires a current gameplay report; unverified projects remain selectable.
 - Native ZIP, TAR.GZ, TAR.XZ, TGZ, and DMG installation preserves complete payloads,
   including tools/SDKs stored beside an app bundle.
-- New Windows games default to Steam / NotProton; each game can switch to direct CrossOver.
+- New Windows games default to direct CrossOver; each game can switch to Steam / NotProton.
+  Existing saved launch methods are preserved. Native Mac builds still take priority.
   Steam receives the actual Windows executable and selected installed NotProton tool.
   Unverified Windows builds require explicit per-game testing opt-in.
 - Record **Playable**, **Playable with adjustments**, or **Unsupported** separately
@@ -32,6 +33,42 @@ The launcher backs up Steam configuration before registering the shortcut and to
 Gameplay reports stay local; this fork does not claim Valve certification or supply
 pre-certified Windows games. Submit reproducible reports through the fork's
 [compatibility report form](https://github.com/GitOpsGarage/GithubLauncher-macOS/issues/new?template=mac-compatibility.yml).
+
+## Community catalog
+
+The catalog combines the configured GitHub app list, bundled projects, and the public
+[Quiver community catalog](https://quiverlauncher.com/). Quiver is an independent
+project; this fork does not claim its endorsement. Settings → Advanced can disable
+that source. Community discovery refreshes at most daily, or with Refresh Catalog,
+with a local cache and a bundled offline snapshot. GitHub tokens are never sent to
+Quiver. Existing library entries and gameplay reports are not replaced.
+
+Browse a single alphabetical grid with game covers, separate game/project names,
+platform badges, search, a platform dropdown with checkboxes and A–Z / Z–A sorting. macOS, Windows,
+Linux and unlisted platforms are selected initially; mobile-only projects are
+hidden unless Android or iOS is selected. Any checked platform can match. Scrolling
+near the end appends the next 36 cards automatically, without resetting the scroll
+position or fetching releases again. Platforms come from Quiver metadata or recorded release assets;
+missing information is shown as "Platforms not listed". The Mac compatibility
+filter and card status still use release evidence and local gameplay reports,
+not the catalog's platform claims. Use **Setup guide** for original game data
+requirements and **+ Add** to add a project to the library.
+
+Only GitHub-backed projects supported by this installer are imported. GitLab/manual
+projects and entries requiring extra setup files or asset-specific filters are
+excluded and counted in the catalog status. Entries sharing a repository are merged.
+Catalog listings and Quiver verification do not establish Mac gameplay compatibility:
+release discovery and local tests remain separate. Downloads come from the project's
+GitHub releases through this launcher's existing installation checks.
+
+To refresh the bundled offline snapshot from the public API, run:
+
+```sh
+dotnet run --project tests/MacCompatibility.Tests.csproj -- --refresh-community-catalog /tmp/github-launcher-community
+cp /tmp/github-launcher-community/quiver_catalog_cache.json quiver-catalog.json
+```
+
+The refresh command fails rather than exporting an incomplete response.
 
 ## Development and commits
 

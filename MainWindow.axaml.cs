@@ -1903,6 +1903,9 @@ namespace GithubLauncher
                 if (AppListRepositoryTextBox != null)
                     AppListRepositoryTextBox.Text = _settings.AppListRepository;
 
+                if (EnableCommunityCatalogCheckBox != null)
+                    EnableCommunityCatalogCheckBox.IsChecked = _settings.EnableCommunityCatalog;
+
                 if (StartFullscreenCheckBox != null)
                     StartFullscreenCheckBox.IsChecked = _settings.StartFullscreen;
 
@@ -3089,7 +3092,7 @@ namespace GithubLauncher
                 SizeToContent = SizeToContent.Height, CanResize = false,
                 WindowStartupLocation = WindowStartupLocation.CenterOwner
             };
-            var runner = new ComboBox { ItemsSource = new[] { "Steam / NotProton (recommended)", "Direct CrossOver" },
+            var runner = new ComboBox { ItemsSource = new[] { "Steam / NotProton", "Direct CrossOver (simpler setup)" },
                 SelectedIndex = game.MacWindowsRunner == "crossover" ? 1 : 0 };
             var bottle = new TextBox { Text = game.CrossOverBottle,
                 Watermark = $"Default bottle: {_settings.CrossOverBottle}" };
@@ -3311,6 +3314,65 @@ namespace GithubLauncher
         }
 
         private List<(string Category, List<CatalogEntry> Entries)>? _loadedCatalogCategories;
+        private readonly HashSet<string> _catalogSelectedPlatforms = ["macos", "windows", "linux"];
+        private bool _catalogIncludeUnknown = true;
+        private bool _catalogLoadQueued;
+        private CatalogViewState? _catalogView;
+
+        private sealed record CatalogViewState(List<CatalogEntry> Entries,
+            Dictionary<string, MacCompatibilityEntry> Compatibility, HashSet<string> LibraryRepos,
+            WrapPanel Cards, TextBlock Count, TextBlock Footer, int Total);
+
+        private void CatalogSearch_TextChanged(object? sender, TextChangedEventArgs e) => RefreshCatalogView();
+        private void CatalogFilter_SelectionChanged(object? sender, SelectionChangedEventArgs e) => RefreshCatalogView();
+        private void CatalogPlatform_CheckedChanged(object? sender, RoutedEventArgs e)
+        {
+            if (sender is not CheckBox { Tag: string key } checkBox) return;
+            if (key == "unknown") _catalogIncludeUnknown = checkBox.IsChecked == true;
+            else if (checkBox.IsChecked == true) _catalogSelectedPlatforms.Add(key);
+            else _catalogSelectedPlatforms.Remove(key);
+            if (this.FindControl<Button>("CatalogPlatformButton") is { } button)
+                button.Content = $"Platforms · {_catalogSelectedPlatforms.Count + (_catalogIncludeUnknown ? 1 : 0)} selected ▾";
+            RefreshCatalogView();
+        }
+
+        private void RefreshCatalogView()
+        {
+            if (_loadedCatalogCategories != null && this.FindControl<StackPanel>("AppCatalogContent") is { } content)
+            {
+                RenderCatalogCategories(content, _loadedCatalogCategories);
+                if (this.FindControl<ScrollViewer>("AppBrowserTab") is { } scroll) scroll.Offset = new Vector(0, 0);
+            }
+        }
+
+        private void Catalog_ScrollChanged(object? sender, ScrollChangedEventArgs e)
+        {
+            if (sender is not ScrollViewer scroll || !scroll.IsVisible || _catalogView is not { } view || _catalogLoadQueued ||
+                !CatalogPresentation.ShouldLoadMore(scroll.Offset.Y, scroll.Viewport.Height, scroll.Extent.Height,
+                    view.Cards.Children.Count, view.Entries.Count)) return;
+            _catalogLoadQueued = true;
+            Dispatcher.UIThread.Post(() =>
+            {
+                _catalogLoadQueued = false;
+                if (ReferenceEquals(view, _catalogView) && scroll.IsVisible &&
+                    CatalogPresentation.ShouldLoadMore(scroll.Offset.Y, scroll.Viewport.Height, scroll.Extent.Height,
+                        view.Cards.Children.Count, view.Entries.Count)) AppendCatalogCards(view);
+            }, DispatcherPriority.Background);
+        }
+
+        private void AppendCatalogCards(CatalogViewState view)
+        {
+            var end = Math.Min(view.Cards.Children.Count + 36, view.Entries.Count);
+            for (int index = view.Cards.Children.Count; index < end; index++)
+            {
+                var entry = view.Entries[index];
+                view.Compatibility.TryGetValue(entry.Repository, out var support);
+                view.Cards.Children.Add(BuildCatalogCard(entry, view.LibraryRepos.Contains(entry.Repository), support));
+            }
+            view.Count.Text = $"Showing {end} of {view.Entries.Count} matching projects · {view.Total} total";
+            view.Footer.Text = end < view.Entries.Count ? "Scroll for more projects"
+                : $"All {view.Entries.Count} matching projects shown";
+        }
 
         public int MacCatalogFilterIndex
         {
@@ -3322,8 +3384,7 @@ namespace GithubLauncher
                 OnPropertyChanged(nameof(MacCatalogFilterIndex));
                 OnPropertyChanged(nameof(MacCatalogFilterDescription));
                 OnSettingChanged();
-                if (_loadedCatalogCategories != null && this.FindControl<StackPanel>("AppCatalogContent") is { } content)
-                    RenderCatalogCategories(content, _loadedCatalogCategories);
+                RefreshCatalogView();
             }
         }
 
@@ -3437,6 +3498,13 @@ namespace GithubLauncher
                 _settings.AppListRepository = textBox.Text?.Trim() ?? "SirDiabo/GHLAppList";
                 OnSettingChanged();
             }
+        }
+
+        private void EnableCommunityCatalog_Changed(object? sender, RoutedEventArgs e)
+        {
+            if (_settings == null || sender is not CheckBox checkbox) return;
+            _settings.EnableCommunityCatalog = checkbox.IsChecked == true;
+            OnSettingChanged();
         }
 
         private void ResetAppListRepository_Click(object sender, RoutedEventArgs e)
@@ -3962,7 +4030,7 @@ namespace GithubLauncher
                     SkippedUpdateVersion = element.TryGetProperty("skippedUpdateVersion", out var skippedUpdateVersion) ? skippedUpdateVersion.GetString() : null,
                     CrossOverBottle = element.TryGetProperty("crossOverBottle", out var bottle) ? bottle.GetString() ?? "" : "",
                     AllowCrossOverTesting = element.TryGetProperty("allowCrossOverTesting", out var testing) && testing.ValueKind == JsonValueKind.True,
-                        MacWindowsRunner = element.TryGetProperty("macWindowsRunner", out var macWindowsRunner) ? macWindowsRunner.GetString() ?? "notproton" : "notproton",
+                        MacWindowsRunner = element.TryGetProperty("macWindowsRunner", out var macWindowsRunner) ? macWindowsRunner.GetString() ?? "crossover" : "crossover",
                         SteamAccount = element.TryGetProperty("steamAccount", out var steamAccount) ? steamAccount.GetString() ?? "" : "",
                         SteamTool = element.TryGetProperty("steamTool", out var steamTool) ? steamTool.GetString() ?? "" : "",
                         SteamExecutable = element.TryGetProperty("steamExecutable", out var steamExecutable) ? steamExecutable.GetString() ?? "" : "",
@@ -4645,17 +4713,8 @@ namespace GithubLauncher
                 if (!File.Exists(AppCatalogCachePath) && File.Exists(bundledCatalogPath))
                     File.Copy(bundledCatalogPath, AppCatalogCachePath);
 
-                if (!File.Exists(AppCatalogCachePath))
-                {
-                    await Dispatcher.UIThread.InvokeAsync(() =>
-                    {
-                        statusText.Text = "Could not retrieve catalog. Check the repository setting and your connection.";
-                        statusText.IsVisible = true;
-                    });
-                    return;
-                }
-
-                string json = await File.ReadAllTextAsync(AppCatalogCachePath).ConfigureAwait(false);
+                string json = File.Exists(AppCatalogCachePath)
+                    ? await File.ReadAllTextAsync(AppCatalogCachePath).ConfigureAwait(false) : "{}";
                 var categories = ParseCatalogJson(json);
                 if (File.Exists(bundledCatalogPath))
                 {
@@ -4665,6 +4724,20 @@ namespace GithubLauncher
                         var additions = category.Entries.Where(e => existing.Add(e.Repository)).ToList();
                         if (additions.Count > 0) categories.Add((category.Category, additions));
                     }
+                }
+                string communityStatus = "";
+                if (_settings?.EnableCommunityCatalog != false)
+                {
+                    await Dispatcher.UIThread.InvokeAsync(() => statusText.Text = "Updating Quiver community catalog…");
+                    var community = await CommunityCatalog.LoadAsync(LauncherPaths.DataDirectory, forceRefresh).ConfigureAwait(false);
+                    var metadata = community.Entries.ToDictionary(e => e.Repository, StringComparer.OrdinalIgnoreCase);
+                    categories = categories.Select(c => (c.Category, c.Entries.Select(e =>
+                        metadata.TryGetValue(e.Repository, out var details) ? e with { Details = details } : e).ToList())).ToList();
+                    var existing = categories.SelectMany(c => c.Entries).Select(e => e.Repository).ToHashSet(StringComparer.OrdinalIgnoreCase);
+                    var additions = community.Entries.Where(e => existing.Add(e.Repository))
+                        .Select(e => new CatalogEntry(e.Name, e.Repository, e.FolderName, e.AppIconUrl, "Quiver community catalog", e)).ToList();
+                    if (additions.Count > 0) categories.Add(("Quiver community catalog — quiverlauncher.com", additions));
+                    communityStatus = community.Status + $" {additions.Count} additional projects.";
                 }
                 string discoveryStatus = string.Empty;
                 if (OperatingSystem.IsMacOS() && forceRefresh)
@@ -4676,8 +4749,8 @@ namespace GithubLauncher
                     if (versionText != null)
                         versionText.Text = string.IsNullOrEmpty(cachedVersion) ? string.Empty : $"Version: {cachedVersion}";
 
-                    statusText.Text = discoveryStatus;
-                    statusText.IsVisible = !string.IsNullOrEmpty(discoveryStatus);
+                    statusText.Text = string.Join("\n", new[] { communityStatus, discoveryStatus }.Where(s => !string.IsNullOrEmpty(s)));
+                    statusText.IsVisible = !string.IsNullOrEmpty(statusText.Text);
                     catalogContent.IsVisible = true;
                     _loadedCatalogCategories = categories;
                     RenderCatalogCategories(catalogContent, categories);
@@ -4727,7 +4800,8 @@ namespace GithubLauncher
             return await client.GetStringAsync(url).ConfigureAwait(false);
         }
 
-        private record CatalogEntry(string Name, string Repository, string FolderName, string AppIconUrl, string Category);
+        private record CatalogEntry(string Name, string Repository, string FolderName, string AppIconUrl, string Category,
+            CommunityCatalogEntry? Details = null);
 
         private List<(string Category, List<CatalogEntry> Entries)> ParseCatalogJson(string json)
         {
@@ -4772,192 +4846,198 @@ namespace GithubLauncher
 
         private void RenderCatalogCategories(StackPanel container, List<(string Category, List<CatalogEntry> Entries)> categories)
         {
+            _catalogView = null;
             container.Children.Clear();
-
-            if (OperatingSystem.IsMacOS())
+            var compatibility = MacCompatibility.Load();
+            var search = this.FindControl<TextBox>("CatalogSearchBox")?.Text ?? "";
+            var descending = this.FindControl<ComboBox>("CatalogSortOrder")?.SelectedIndex == 1;
+            var all = categories.SelectMany(c => c.Entries)
+                .DistinctBy(e => e.Repository, StringComparer.OrdinalIgnoreCase).ToList();
+            var entries = all.Where(e =>
             {
-                int totalEntries = categories.Sum(c => c.Entries.Count);
-                var compatibility = MacCompatibility.Load();
-                var filter = (MacCatalogFilter)MacCatalogFilterIndex;
-                categories = categories.Select(c => (c.Category, c.Entries.Where(e =>
-                {
-                    compatibility.TryGetValue(e.Repository, out var entry);
-                    return MacCompatibility.MatchesCatalogFilter(entry, filter);
-                }).ToList())).Where(c => c.Item2.Count > 0).ToList();
+                compatibility.TryGetValue(e.Repository, out var support);
+                var systems = CatalogPresentation.Platforms(e.Details?.SupportedOS ?? [], support);
+                return CatalogPresentation.MatchesSearch(search, e.Name, e.Repository,
+                        e.Details?.DisplayName ?? "", e.Details?.ProjectName ?? "") &&
+                    CatalogPresentation.MatchesPlatforms(systems, _catalogSelectedPlatforms, _catalogIncludeUnknown) &&
+                    (!OperatingSystem.IsMacOS() || MacCompatibility.MatchesCatalogFilter(support, (MacCatalogFilter)MacCatalogFilterIndex));
+            });
+            string Title(CatalogEntry entry) => string.IsNullOrWhiteSpace(entry.Details?.DisplayName)
+                ? entry.Name : entry.Details.DisplayName;
+            var ordered = (descending ? entries.OrderByDescending(Title, StringComparer.OrdinalIgnoreCase)
+                : entries.OrderBy(Title, StringComparer.OrdinalIgnoreCase)).ThenBy(e => e.Repository, StringComparer.OrdinalIgnoreCase).ToList();
+            var count = new TextBlock
+            {
+                Text = $"Showing 0 of {ordered.Count} matching projects · {all.Count} total",
+                FontSize = 12, Foreground = this.FindResource("ThemeTextSecondary") as IBrush
+            };
+            container.Children.Add(count);
+            if (ordered.Count == 0)
+            {
                 container.Children.Add(new TextBlock
                 {
-                    Text = $"{categories.Sum(c => c.Entries.Count)} of {totalEntries} catalog entries",
-                    FontSize = 12, Foreground = this.FindResource("ThemeTextSecondary") as IBrush
-                });
-            }
-
-            if (categories.Count == 0)
-            {
-                var empty = new TextBlock
-                {
-                    Text = OperatingSystem.IsMacOS() && MacCatalogFilterIndex != 0
-                        ? "No games match this filter yet. Choose All games to browse the full catalog."
-                        : "No entries found in catalog.",
-                    FontSize = 13,
+                    Text = "No projects match. Try another search, platform or Mac compatibility filter.",
+                    FontSize = 14, TextWrapping = TextWrapping.Wrap,
                     Foreground = this.FindResource("ThemeTextSecondary") as IBrush,
-                };
-                container.Children.Add(empty);
+                    Margin = new Thickness(0, 24)
+                });
                 return;
             }
-
-            var installedRepos = new HashSet<string>(
-                _gameManager?.Games.Select(g => g.Repository ?? string.Empty) ?? Enumerable.Empty<string>(),
-                StringComparer.OrdinalIgnoreCase);
-
-            foreach (var (categoryName, entries) in categories)
+            var libraryRepos = (_gameManager?.Games.Select(g => g.Repository ?? "") ?? [])
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var cards = new WrapPanel { VerticalAlignment = VerticalAlignment.Top };
+            container.Children.Add(cards);
+            var footer = new TextBlock
             {
-                var categoryHeader = new TextBlock
-                {
-                    Text = categoryName.ToUpperInvariant(),
-                    FontSize = 11,
-                    FontWeight = FontWeight.Bold,
-                    Foreground = this.FindResource("ThemeTextSecondary") as IBrush,
-                    Margin = new Thickness(0, 8, 0, 6),
-                };
-                container.Children.Add(categoryHeader);
-
-                var wrapPanel = new WrapPanel { Margin = new Thickness(0, 8, 0, 0), VerticalAlignment = VerticalAlignment.Top };
-                foreach (var entry in entries)
-                {
-                    bool alreadyAdded = installedRepos.Contains(entry.Repository);
-                    var card = BuildCatalogCard(entry, alreadyAdded);
-                    wrapPanel.Children.Add(card);
-                }
-                container.Children.Add(wrapPanel);
-            }
+                FontSize = 12, Foreground = this.FindResource("ThemeTextSecondary") as IBrush,
+                HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 0, 0, 20)
+            };
+            container.Children.Add(footer);
+            _catalogView = new(ordered, compatibility, libraryRepos, cards, count, footer, all.Count);
+            AppendCatalogCards(_catalogView);
         }
 
-private Border BuildCatalogCard(CatalogEntry entry, bool alreadyAdded)
+        private Border BuildCatalogCard(CatalogEntry entry, bool alreadyAdded, MacCompatibilityEntry? compatibility)
         {
-            var image = new Border
+            var textBrush = this.FindResource("ThemeText") as IBrush;
+            var secondaryBrush = this.FindResource("ThemeTextSecondary") as IBrush;
+            var coverUrl = entry.Details?.CoverUrl;
+            var hasCover = !string.IsNullOrWhiteSpace(coverUrl);
+            var artwork = hasCover ? coverUrl! : entry.AppIconUrl;
+            var cover = new Grid
             {
-                Height = 200,
-                Background = this.FindResource("ThemeLighter") as IBrush,
+                Height = 132, Background = this.FindResource("ThemeLighter") as IBrush,
+                ClipToBounds = true
             };
-
-            if (!string.IsNullOrEmpty(entry.AppIconUrl))
+            cover.Children.Add(new TextBlock
             {
-                var img = new Image
+                Text = entry.Name[..1].ToUpperInvariant(), FontSize = 44, FontWeight = FontWeight.Bold,
+                Foreground = secondaryBrush, Opacity = 0.25,
+                HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center
+            });
+            if (!string.IsNullOrEmpty(artwork))
+            {
+                var image = new Image
                 {
-                    Stretch = Stretch.UniformToFill,
+                    Stretch = hasCover ? Stretch.UniformToFill : Stretch.Uniform,
+                    Margin = hasCover ? new Thickness(0) : new Thickness(20),
+                    HorizontalAlignment = HorizontalAlignment.Stretch, VerticalAlignment = VerticalAlignment.Stretch
                 };
-                image.Child = img;
-
-                _ = Task.Run(async () =>
+                ImageLoader.SetSource(image, artwork);
+                cover.Children.Add(image);
+            }
+            if (alreadyAdded)
+            {
+                cover.Children.Add(new Border
                 {
-                    try
-                    {
-                        using var client = new System.Net.Http.HttpClient();
-                        var imageData = await client.GetByteArrayAsync(entry.AppIconUrl);
-                        var bitmap = new Avalonia.Media.Imaging.Bitmap(new System.IO.MemoryStream(imageData));
-
-                        await Dispatcher.UIThread.InvokeAsync(() =>
-                        {
-                            img.Source = bitmap;
-                        });
-                    }
-                    catch
-                    {
-                    }
+                    Background = new SolidColorBrush(Color.Parse("#D8E5F0")), CornerRadius = new CornerRadius(4),
+                    Padding = new Thickness(7, 3), Margin = new Thickness(10),
+                    HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Top,
+                    Child = new TextBlock { Text = "IN LIBRARY", FontSize = 9, FontWeight = FontWeight.Bold,
+                        Foreground = new SolidColorBrush(Color.Parse("#172331")) }
                 });
             }
 
-            var nameBlock = new TextBlock
+            var body = new StackPanel { Margin = new Thickness(14, 12, 14, 8), Spacing = 5 };
+            body.Children.Add(new TextBlock
             {
-                Text = entry.Name,
-                FontSize = 13,
-                FontWeight = FontWeight.Bold,
-                Foreground = this.FindResource("ThemeText") as IBrush,
-                TextWrapping = TextWrapping.Wrap,
-                Margin = new Thickness(0, 8, 0, 2),
+                Text = CatalogPresentation.ProjectLabel(entry.Details?.ProjectType ?? ""),
+                FontSize = 10, LetterSpacing = 1, Foreground = secondaryBrush
+            });
+            var title = new TextBlock
+            {
+                Text = string.IsNullOrWhiteSpace(entry.Details?.DisplayName) ? entry.Name : entry.Details.DisplayName,
+                FontSize = 15, FontWeight = FontWeight.SemiBold, Foreground = textBrush,
+                TextWrapping = TextWrapping.Wrap, TextTrimming = TextTrimming.CharacterEllipsis,
+                MaxLines = 2, Height = 40
             };
-
-            var repoBlock = new TextBlock
+            ToolTip.SetTip(title, entry.Name);
+            body.Children.Add(title);
+            var project = new TextBlock
             {
-                Text = entry.Repository,
-                FontSize = 11,
-                Foreground = this.FindResource("ThemeTextSecondary") as IBrush,
-                TextWrapping = TextWrapping.Wrap,
+                Text = string.IsNullOrWhiteSpace(entry.Details?.ProjectName) ? entry.Repository : entry.Details.ProjectName,
+                FontSize = 11, Foreground = secondaryBrush, TextTrimming = TextTrimming.CharacterEllipsis
             };
-
-            var infoStack = new StackPanel();
-            infoStack.Children.Add(nameBlock);
-            infoStack.Children.Add(repoBlock);
-            if (OperatingSystem.IsMacOS())
+            ToolTip.SetTip(project, entry.Repository + "\n" + entry.Category);
+            body.Children.Add(project);
+            var platforms = new WrapPanel { MinHeight = 44, Margin = new Thickness(0, 4, 0, 0) };
+            var systems = CatalogPresentation.Platforms(entry.Details?.SupportedOS ?? [], compatibility);
+            foreach (var system in systems.Length == 0 ? new[] { "unknown" } : systems)
             {
-                infoStack.Children.Add(new TextBlock { Text = GameDataRequirements.Find(entry.Repository).Summary,
-                    FontSize = 11, TextWrapping = TextWrapping.Wrap, Foreground = this.FindResource("ThemeTextSecondary") as IBrush });
-                var dataButton = new Button { Content = "ROM / disc…", FontSize = 11, Margin = new Thickness(0, 4, 0, 4) };
-                dataButton.Click += async (_, _) => await ShowGameDataRequirementsAsync(entry.Name, entry.Repository);
-                infoStack.Children.Add(dataButton);
+                var content = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 4 };
+                var icon = system switch { "macos" => "mac", "windows" => "win", "linux" => "lin", _ => null };
+                if (icon != null)
+                {
+                    var image = new Image { Width = 12, Height = 12 };
+                    ImageLoader.SetSource(image, $"avares://GithubLauncher/Assets/Icons/platform_{icon}.png");
+                    content.Children.Add(image);
+                }
+                content.Children.Add(new TextBlock
+                {
+                    Text = system == "unknown" ? "Platforms not listed" : CatalogPresentation.PlatformLabel(system),
+                    FontSize = 10, Foreground = textBrush
+                });
+                var badge = new Border
+                {
+                    Child = content, CornerRadius = new CornerRadius(4), Padding = new Thickness(6, 3),
+                    Background = this.FindResource("ThemeLighter") as IBrush,
+                    Margin = new Thickness(0, 0, 5, 5), VerticalAlignment = VerticalAlignment.Top
+                };
+                ToolTip.SetTip(badge, "Platforms listed by the project catalog or recorded release assets. This is not a Mac gameplay report.");
+                platforms.Children.Add(badge);
             }
+            body.Children.Add(platforms);
             if (OperatingSystem.IsMacOS())
             {
-                var compatibility = MacCompatibility.Find(entry.Repository);
                 var label = MacCompatibility.BrowseCategory(compatibility) switch
                 {
-                    MacCatalogFilter.Native => "Native Mac build",
-                    MacCatalogFilter.WindowsPlayable => "Windows — playable on Mac",
+                    MacCatalogFilter.Native => "Native Mac release",
+                    MacCatalogFilter.WindowsPlayable => "Windows · playable on this Mac",
                     _ => MacCompatibility.CatalogCategory(compatibility) == "candidate"
-                        ? "Windows — available to try" : "Mac support unconfirmed"
+                        ? "Windows · untested on Mac" : "Mac support unconfirmed"
                 };
-                var support = new TextBlock { Text = label + "\n" + MacGameplay.Summary(compatibility), FontSize = 11, TextWrapping = TextWrapping.Wrap,
-                    Foreground = this.FindResource("ThemeTextSecondary") as IBrush };
-                ToolTip.SetTip(support, compatibility == null ? "No evidence recorded." :
+                var support = new TextBlock
+                {
+                    Text = label + "\n" + MacGameplay.Summary(compatibility), FontSize = 11,
+                    TextWrapping = TextWrapping.Wrap, TextTrimming = TextTrimming.CharacterEllipsis,
+                    MaxLines = 3, Foreground = secondaryBrush
+                };
+                ToolTip.SetTip(support, compatibility == null ? "No Mac release or gameplay evidence recorded." :
                     $"{compatibility.Release}: {compatibility.AssetName}\n{compatibility.Requirements}\n{compatibility.Evidence}\n\n{MacGameplay.Details(compatibility)}");
-                infoStack.Children.Add(support);
+                body.Children.Add(support);
             }
 
-            var addButton = new Button
+            var actions = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto"), Margin = new Thickness(14, 8, 14, 14) };
+            var detailsButton = new Button
             {
-                Content = alreadyAdded ? "Added" : "Add",
-                FontSize = 11,
-                Margin = new Thickness(2, 2, 2, 2),
-                Width = 70,
-                Height = 48,
-                IsEnabled = !alreadyAdded,
+                Content = "Setup guide", FontSize = 11, HorizontalAlignment = HorizontalAlignment.Left,
+                Padding = new Thickness(8, 6), MinHeight = 32
             };
-            addButton.Classes.Add("options");
-
-            if (!alreadyAdded)
+            detailsButton.Click += async (_, _) => await ShowGameDataRequirementsAsync(entry.Name, entry.Repository);
+            ToolTip.SetTip(detailsButton, GameDataRequirements.Find(entry.Repository).Summary);
+            actions.Children.Add(detailsButton);
+            var add = new Button
             {
-                addButton.Tag = entry;
-                addButton.Click += CatalogAddEntry_Click;
-            }
-
-            var footerGrid = new Grid
-            {
-                Margin = new Thickness(8, 4, 8, 8),
+                Content = alreadyAdded ? "Added" : "+ Add", IsEnabled = !alreadyAdded,
+                FontSize = 11, MinHeight = 32, Padding = new Thickness(12, 6), Tag = entry,
+                HorizontalAlignment = HorizontalAlignment.Right
             };
-            footerGrid.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Star));
-            footerGrid.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Auto));
-            Grid.SetColumn(infoStack, 0);
-            Grid.SetColumn(addButton, 1);
-            footerGrid.Children.Add(infoStack);
-            footerGrid.Children.Add(addButton);
-
-            var cardGrid = new Grid();
-            cardGrid.RowDefinitions.Add(new RowDefinition(GridLength.Auto));
-            cardGrid.RowDefinitions.Add(new RowDefinition(GridLength.Star));
-            Grid.SetRow(image, 0);
-            Grid.SetRow(footerGrid, 1);
-            cardGrid.Children.Add(image);
-            cardGrid.Children.Add(footerGrid);
-
+            add.Classes.Add("options");
+            if (!alreadyAdded) add.Click += CatalogAddEntry_Click;
+            Grid.SetColumn(add, 1);
+            actions.Children.Add(add);
+            var layout = new Grid { RowDefinitions = new RowDefinitions("Auto,*,Auto") };
+            layout.Children.Add(cover);
+            Grid.SetRow(body, 1);
+            layout.Children.Add(body);
+            Grid.SetRow(actions, 2);
+            layout.Children.Add(actions);
             return new Border
             {
-                Width = 200,
-                Margin = new Thickness(6),
+                Width = 236, Height = 412, Margin = new Thickness(0, 0, 14, 14),
                 Background = this.FindResource("ThemeBase") as IBrush,
-                BorderBrush = this.FindResource("ThemeBorder") as IBrush,
-                BorderThickness = new Thickness(1),
-                CornerRadius = new CornerRadius(8),
-                Child = cardGrid,
+                BorderBrush = this.FindResource("ThemeBorder") as IBrush, BorderThickness = new Thickness(1),
+                CornerRadius = new CornerRadius(10), ClipToBounds = true, Child = layout
             };
         }
 
