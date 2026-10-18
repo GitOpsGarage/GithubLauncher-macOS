@@ -11,6 +11,10 @@ public sealed record CommunityCatalogEntry(string Name, string Repository, strin
     public string CoverUrl { get; init; } = "";
     public string ProjectType { get; init; } = "";
     public string[] SupportedOS { get; init; } = [];
+    public string[] Tags { get; init; } = [];
+    public string[] OriginalSystems { get; init; } = [];
+    public string[] OriginalGames { get; init; } = [];
+    public int MetadataVersion { get; init; }
 }
 public sealed record CommunityCatalogResult(List<CommunityCatalogEntry> Entries, string Status);
 
@@ -30,8 +34,16 @@ public static class CommunityCatalog
         if (cached != null && bundled != null)
         {
             var metadata = bundled.Entries.ToDictionary(e => e.Repository, StringComparer.OrdinalIgnoreCase);
-            cached.Entries = cached.Entries.Select(e => string.IsNullOrEmpty(e.DisplayName) &&
-                metadata.TryGetValue(e.Repository, out var newer) ? newer : e).ToList();
+            cached.Entries = cached.Entries.Select(e =>
+            {
+                if (!metadata.TryGetValue(e.Repository, out var newer)) return e;
+                if (string.IsNullOrEmpty(e.DisplayName)) return newer;
+                return e.MetadataVersion < newer.MetadataVersion ? e with
+                {
+                    Tags = newer.Tags, OriginalSystems = newer.OriginalSystems,
+                    OriginalGames = newer.OriginalGames, MetadataVersion = newer.MetadataVersion
+                } : e;
+            }).ToList();
         }
         cached ??= bundled;
         if (!refresh && cached != null && cached.CheckedAt > DateTimeOffset.UtcNow.AddHours(-24))
@@ -126,11 +138,22 @@ public static class CommunityCatalog
             ? HttpsUrl(Text(art, "header")) : "";
         var title = string.IsNullOrWhiteSpace(projectName) || name.Equals(projectName, StringComparison.OrdinalIgnoreCase)
             ? name : $"{name} ({projectName})";
+        var originals = Objects(entry, "games").Concat(Objects(root, "games")).ToList();
+        if (root.TryGetProperty("game", out var game) && game.ValueKind == JsonValueKind.Object) originals.Add(game);
+        var consoles = Strings(entry, "consoles").Concat(originals.SelectMany(g => Strings(g, "originalSystems")));
+        if (entry.TryGetProperty("basedOn", out var basedOn) && basedOn.ValueKind == JsonValueKind.Object)
+            consoles = consoles.Append(Text(basedOn, "console"));
         // Derive a portable, unique folder instead of trusting external paths.
         return new(title, repository, repository.Replace('/', '_'), icon)
         {
             DisplayName = name, ProjectName = projectName, CoverUrl = cover,
             ProjectType = Text(entry, "projectType"),
+            Tags = Strings(entry, "tags").Distinct(StringComparer.OrdinalIgnoreCase).ToArray(),
+            OriginalSystems = consoles.Where(s => !string.IsNullOrWhiteSpace(s)).Select(s => s.Trim().ToLowerInvariant())
+                .Distinct(StringComparer.OrdinalIgnoreCase).ToArray(),
+            OriginalGames = originals.Select(g => Text(g, "title")).Where(s => !string.IsNullOrWhiteSpace(s))
+                .Distinct(StringComparer.OrdinalIgnoreCase).ToArray(),
+            MetadataVersion = 2,
             SupportedOS = entry.TryGetProperty("supportedOS", out var systems) && systems.ValueKind == JsonValueKind.Array
                 ? CatalogPresentation.Platforms(systems.EnumerateArray().Where(v => v.ValueKind == JsonValueKind.String)
                     .Select(v => v.GetString()!)) : []
@@ -139,6 +162,15 @@ public static class CommunityCatalog
 
     private static string HttpsUrl(string value) =>
         Uri.TryCreate(value, UriKind.Absolute, out var uri) && uri.Scheme == "https" ? value : "";
+
+    private static IEnumerable<string> Strings(JsonElement element, string property) =>
+        element.TryGetProperty(property, out var values) && values.ValueKind == JsonValueKind.Array
+            ? values.EnumerateArray().Where(v => v.ValueKind == JsonValueKind.String)
+                .Select(v => v.GetString()!.Trim()).Where(s => s.Length > 0) : [];
+
+    private static IEnumerable<JsonElement> Objects(JsonElement element, string property) =>
+        element.TryGetProperty(property, out var values) && values.ValueKind == JsonValueKind.Array
+            ? values.EnumerateArray().Where(v => v.ValueKind == JsonValueKind.Object) : [];
 
     private static string Text(JsonElement element, string property) =>
         element.TryGetProperty(property, out var value) && value.ValueKind == JsonValueKind.String ? value.GetString() ?? "" : "";

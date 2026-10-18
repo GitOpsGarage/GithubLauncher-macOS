@@ -4858,7 +4858,9 @@ namespace GithubLauncher
                 compatibility.TryGetValue(e.Repository, out var support);
                 var systems = CatalogPresentation.Platforms(e.Details?.SupportedOS ?? [], support);
                 return CatalogPresentation.MatchesSearch(search, e.Name, e.Repository,
-                        e.Details?.DisplayName ?? "", e.Details?.ProjectName ?? "") &&
+                        e.Details?.DisplayName ?? "", e.Details?.ProjectName ?? "",
+                        CatalogPresentation.ProjectLabel(e.Details?.ProjectType ?? "", e.Details?.Tags),
+                        CatalogPresentation.OriginSummary(e.Details)) &&
                     CatalogPresentation.MatchesPlatforms(systems, _catalogSelectedPlatforms, _catalogIncludeUnknown) &&
                     (!OperatingSystem.IsMacOS() || MacCompatibility.MatchesCatalogFilter(support, (MacCatalogFilter)MacCatalogFilterIndex));
             });
@@ -4941,8 +4943,9 @@ namespace GithubLauncher
             var body = new StackPanel { Margin = new Thickness(14, 12, 14, 8), Spacing = 5 };
             body.Children.Add(new TextBlock
             {
-                Text = CatalogPresentation.ProjectLabel(entry.Details?.ProjectType ?? ""),
-                FontSize = 10, LetterSpacing = 1, Foreground = secondaryBrush
+                Text = CatalogPresentation.ProjectLabel(entry.Details?.ProjectType ?? "", entry.Details?.Tags),
+                FontSize = 10, LetterSpacing = 1, Foreground = secondaryBrush,
+                TextWrapping = TextWrapping.Wrap, MaxLines = 2, MinHeight = 26
             });
             var title = new TextBlock
             {
@@ -4960,6 +4963,15 @@ namespace GithubLauncher
             };
             ToolTip.SetTip(project, entry.Repository + "\n" + entry.Category);
             body.Children.Add(project);
+            var origin = new TextBlock
+            {
+                Text = CatalogPresentation.OriginSummary(entry.Details), FontSize = 11,
+                Foreground = secondaryBrush, TextWrapping = TextWrapping.Wrap,
+                TextTrimming = TextTrimming.CharacterEllipsis, MaxLines = 3, Height = 48
+            };
+            ToolTip.SetTip(origin, entry.Details == null ? "No original game or console metadata recorded for this project."
+                : origin.Text + "\nSource: Quiver community catalog");
+            body.Children.Add(origin);
             var platforms = new WrapPanel { MinHeight = 44, Margin = new Thickness(0, 4, 0, 0) };
             var systems = CatalogPresentation.Platforms(entry.Details?.SupportedOS ?? [], compatibility);
             foreach (var system in systems.Length == 0 ? new[] { "unknown" } : systems)
@@ -5034,7 +5046,7 @@ namespace GithubLauncher
             layout.Children.Add(actions);
             return new Border
             {
-                Width = 236, Height = 412, Margin = new Thickness(0, 0, 14, 14),
+                Width = 236, Height = 480, Margin = new Thickness(0, 0, 14, 14),
                 Background = this.FindResource("ThemeBase") as IBrush,
                 BorderBrush = this.FindResource("ThemeBorder") as IBrush, BorderThickness = new Thickness(1),
                 CornerRadius = new CornerRadius(10), ClipToBounds = true, Child = layout

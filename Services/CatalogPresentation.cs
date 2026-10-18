@@ -38,11 +38,48 @@ public static class CatalogPresentation
         "android" => "Android", "ios" => "iOS", _ => "Not listed"
     };
 
-    public static string ProjectLabel(string type) => type.ToLowerInvariant() switch
+    public static string ProjectLabel(string type, IEnumerable<string>? tags = null)
+    {
+        var methods = (tags ?? []).Select(t => t.Trim().ToLowerInvariant() switch
+        {
+            "decomp" or "decompilation" => "DECOMPILATION",
+            "recomp" or "recompilation" or "static recompilation" => "RECOMPILATION",
+            "remake" => "REMAKE", "recreation" => "RECREATION", _ => ""
+        }).Where(s => s.Length > 0).Distinct().ToArray();
+        return methods.Length > 0 ? string.Join(" · ", methods) : ProjectTypeLabel(type);
+    }
+
+    private static string ProjectTypeLabel(string type) => type.ToLowerInvariant() switch
     {
         "port" => "PORT", "recomp" or "recompilation" => "RECOMPILATION",
         "decomp" or "decompilation" => "DECOMPILATION", "remake" => "REMAKE",
-        "recreation" => "RECREATION", "engine" => "ENGINE", _ => "PROJECT"
+        "recreation" => "RECREATION", "engine" => "ENGINE", "tool" => "TOOL",
+        "emulator" => "EMULATOR", "game" => "STANDALONE GAME", _ => "PROJECT"
+    };
+
+    public static string OriginSummary(CommunityCatalogEntry? entry)
+    {
+        var systems = (entry?.OriginalSystems ?? []).Select(ConsoleLabel).Distinct().ToArray();
+        var games = entry?.OriginalGames ?? [];
+        return string.Join("\n", new[]
+        {
+            systems.Length > 0 ? "Origin: " + string.Join(" · ", systems) : "Origin not listed",
+            games.Length > 0 ? "Based on: " + string.Join(" · ", games) : ""
+        }.Where(s => s.Length > 0));
+    }
+
+    public static string ConsoleLabel(string id) => id.Trim().ToLowerInvariant() switch
+    {
+        "nes" => "NES", "snes" => "SNES", "n64" => "Nintendo 64", "gcn" => "GameCube",
+        "wii" => "Wii", "wiiu" => "Wii U", "switch" => "Nintendo Switch",
+        "gb" => "Game Boy", "vb" => "Virtual Boy", "gbc" => "Game Boy Color", "gba" => "Game Boy Advance",
+        "nds" => "Nintendo DS", "3ds" => "Nintendo 3DS", "ps1" => "PlayStation (PS1)",
+        "ps2" => "PlayStation 2", "ps3" => "PlayStation 3", "ps4" => "PlayStation 4",
+        "ps5" => "PlayStation 5", "psp" => "PlayStation Portable", "og xbox" => "Xbox", "x360" => "Xbox 360",
+        "sms" => "Sega Master System", "gg" => "Sega Game Gear", "gen" => "Sega Genesis / Mega Drive",
+        "segacd" => "Sega CD / Mega-CD", "32x" => "Sega 32X", "saturn" => "Sega Saturn",
+        "dreamcast" => "Sega Dreamcast", "arcade" => "Arcade", "pc" => "PC", "mobile" => "Mobile",
+        _ => id
     };
 
     public static bool MatchesSearch(string query, params string[] fields) =>

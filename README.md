@@ -46,6 +46,9 @@ with a local cache and a bundled offline snapshot. GitHub tokens are never sent 
 Quiver. Existing library entries and gameplay reports are not replaced.
 
 Browse a single alphabetical grid with game covers, separate game/project names,
+project methods (such as decompilation or recompilation), original games and source
+consoles from Quiver metadata. Missing origins remain explicitly unlisted. Search
+also matches these method and origin labels. The catalog includes
 platform badges, search, a platform dropdown with checkboxes and A–Z / Z–A sorting. macOS, Windows,
 Linux and unlisted platforms are selected initially; mobile-only projects are
 hidden unless Android or iOS is selected. Any checked platform can match. Scrolling

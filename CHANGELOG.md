@@ -11,7 +11,10 @@ and compatibility status.
 
 ### Added
 
-- Quiver community catalog integration with 381 supported GitHub projects in the
+- Project method labels from Quiver tags, including decompilation and recompilation,
+  plus original game and source-console information on catalog cards. Missing
+  origins are explicitly unlisted; existing caches receive new metadata offline.
+- Quiver community catalog integration with 383 supported GitHub projects in the
   bundled offline snapshot. Catalog updates are cached, and GitHub credentials are
   never sent to Quiver.
 - Catalog search across game names, projects and repositories, alphabetical sorting,

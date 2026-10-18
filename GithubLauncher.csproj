@@ -7,7 +7,7 @@
 		<AssemblyDescription>Download and manage GitHub-hosted game ports</AssemblyDescription>
 		<Version>$([System.IO.File]::ReadAllText('$(MSBuildProjectDirectory)/version.txt').Trim())</Version>
 		<AssemblyVersion>1.0.0.0</AssemblyVersion>
-		<FileVersion>1.0.0.0</FileVersion>
+		<FileVersion>1.0.0.1</FileVersion>
 		<Configurations>Debug;Release</Configurations>
 		<Platforms>AnyCPU;x64</Platforms>
 		<Nullable>enable</Nullable>

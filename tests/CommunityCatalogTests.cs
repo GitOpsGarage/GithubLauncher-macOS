@@ -28,14 +28,29 @@ static class CommunityCatalogTests
 
             var metadata = Parse("""
                 {"entry":{"name":"Original Game","projectName":"Community Port","projectType":"port",
+                "tags":["decomp","decompilation",12],"consoles":["n64"],"basedOn":{"console":"n64"},
+                "games":[{"title":"Original Game"},{"title":"Other Game"}],
                 "supportedOS":["Windows","macOS","LINUX","macos","unknown",12],
                 "libraryArt":{"header":"https://example.com/cover.jpg"}},
+                "game":{"title":"Original Game","originalSystems":["ps1"]},
                 "project":{"provider":"github","repository":"team/game"}}
                 """)!;
             Check(metadata.DisplayName == "Original Game" && metadata.ProjectName == "Community Port" &&
                 metadata.CoverUrl == "https://example.com/cover.jpg" && metadata.ProjectType == "port" &&
                 metadata.SupportedOS.SequenceEqual(new[] { "macos", "windows", "linux" }),
                 "Catalog display metadata must survive import, with distinct normalized platforms.");
+            Check(metadata.OriginalSystems.SequenceEqual(new[] { "n64", "ps1" }) &&
+                metadata.OriginalGames.SequenceEqual(new[] { "Original Game", "Other Game" }) && metadata.Tags.Length == 2,
+                "Original game, source console and method tags must survive import and deduplicate independently.");
+            Check(CatalogPresentation.ProjectLabel(metadata.ProjectType, metadata.Tags) == "DECOMPILATION" &&
+                CatalogPresentation.ProjectLabel("port", ["recomp", "recompilation"]) == "RECOMPILATION" &&
+                CatalogPresentation.ProjectLabel("port", ["controller support"]) == "PORT",
+                "Explicit method tags must refine generic port types without guessing from unrelated tags.");
+            Check(CatalogPresentation.OriginSummary(metadata).Contains("Nintendo 64 · PlayStation (PS1)") &&
+                CatalogPresentation.OriginSummary(metadata).Contains("Original Game · Other Game") &&
+                CatalogPresentation.OriginSummary(valid) == "Origin not listed" &&
+                CatalogPresentation.OriginSummary(null) == "Origin not listed",
+                "Origin labels must show recorded consoles/games and explicitly handle missing metadata.");
             Check(!MacCompatibility.MatchesCatalogFilter(null, MacCatalogFilter.Native),
                 "A catalog's macOS claim must not become recorded native release evidence.");
             Check(CatalogPresentation.Platforms([], new() { AssetName = "source.tar.gz", Evidence = "release" }).Length == 0,
@@ -99,6 +114,14 @@ static class CommunityCatalogTests
             result = await CommunityCatalog.LoadAsync(directory, false, offline, bundle);
             Check(result.Entries.Count == 2 && result.Entries.Single(e => e.Repository == "team/game").SupportedOS.Length == 3,
                 "Old fresh caches must gain bundled display metadata offline without losing cached projects.");
+            legacyCache.Entries = legacyCache.Entries.Select(e => e with { DisplayName = "Cached title", MetadataVersion = 0 }).ToList();
+            File.WriteAllText(Path.Combine(directory, "quiver_catalog_cache.json"), JsonSerializer.Serialize(legacyCache,
+                new JsonSerializerOptions(JsonSerializerDefaults.Web)));
+            result = await CommunityCatalog.LoadAsync(directory, false, offline, bundle);
+            var upgraded = result.Entries.Single(e => e.Repository == "team/game");
+            Check(upgraded.DisplayName == "Cached title" && upgraded.MetadataVersion == 2 &&
+                upgraded.OriginalGames.Length == 2 && upgraded.Tags.Contains("decomp"),
+                "Existing display metadata must be retained while old caches gain method and origin fields offline.");
             Console.WriteLine("Community catalog pagination, mapping, deduplication, offline and failure checks passed.");
         }
         finally { Directory.Delete(directory, true); }
