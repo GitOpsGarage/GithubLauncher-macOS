@@ -4,8 +4,10 @@ cd "$(dirname "$0")/.."
 DOTNET_BIN="${DOTNET_BIN:-dotnet}"
 task_rid="${1:-osx-arm64}"
 case "$task_rid" in osx-arm64|osx-x64) ;; *) echo "Use osx-arm64 or osx-x64" >&2; exit 1;; esac
-task_output="$PWD/publish/$task_rid"
-task_bundle="$PWD/publish/GithubLauncher-Mac.app"
+task_publish_root="${MACOS_OUTPUT_ROOT:-$PWD/publish}"
+task_version="$(tr -d '\r\n' < version.txt)"
+task_output="$task_publish_root/$task_rid"
+task_bundle="$task_publish_root/GithubLauncher-Mac.app"
 "$DOTNET_BIN" publish GithubLauncher.csproj -c Release -r "$task_rid" --self-contained true \
     -p:PublishSingleFile=false -p:PublishTrimmed=false -o "$task_output"
 # A previous build can contain native libraries for a different architecture.
@@ -13,7 +15,7 @@ rm -rf "$task_bundle"
 mkdir -p "$task_bundle/Contents/MacOS" "$task_bundle/Contents/Resources"
 cp -R "$task_output/" "$task_bundle/Contents/MacOS/"
 chmod +x "$task_bundle/Contents/MacOS/GithubLauncher"
-task_iconset="$PWD/publish/GithubLauncher.iconset"
+task_iconset="$task_publish_root/GithubLauncher.iconset"
 mkdir -p "$task_iconset"
 for task_size in 16 32 128 256 512; do
     sips -z "$task_size" "$task_size" Assets/app.png --out "$task_iconset/icon_${task_size}x${task_size}.png" >/dev/null
@@ -46,12 +48,17 @@ cat > "$task_bundle/Contents/Info.plist" <<'PLIST'
 <key>CFBundleName</key><string>Github Launcher Mac — GitOpsGarage</string>
 <key>CFBundleDisplayName</key><string>GitHub Launcher Mac</string>
 <key>CFBundleIconFile</key><string>GithubLauncher.icns</string>
-<key>CFBundleVersion</key><string>1.0.0</string>
-<key>CFBundleShortVersionString</key><string>1.0.0</string>
+<key>CFBundleVersion</key><string>2</string>
+<key>CFBundleShortVersionString</key><string>0.1.0</string>
 <key>CFBundlePackageType</key><string>APPL</string>
 <key>LSMinimumSystemVersion</key><string>12.0</string>
 <key>NSHighResolutionCapable</key><true/>
 </dict></plist>
 PLIST
 /usr/libexec/PlistBuddy -c "Set :CFBundleIconFile $task_icon_name" "$task_bundle/Contents/Info.plist"
+/usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString ${task_version%%-*}" "$task_bundle/Contents/Info.plist"
+/usr/libexec/PlistBuddy -c "Set :LSMinimumSystemVersion ${MACOS_MIN_VERSION:-12.0}" "$task_bundle/Contents/Info.plist"
+cp LICENSE "$task_bundle/Contents/Resources/LICENSE.txt"
+cp lib/GitHubLauncher.Core/LICENSE "$task_bundle/Contents/Resources/GitHubLauncher.Core-LICENSE.txt"
+cp CHANGELOG.md MACOS.md "$task_bundle/Contents/Resources/"
 echo "Built: $task_bundle"

@@ -1,5 +1,7 @@
 # GitHub Launcher Mac — GitOpsGarage
 
+See [CHANGELOG.md](CHANGELOG.md) for macOS fork release notes.
+
 A maintained macOS fork of [SirDiabo/GithubLauncher](https://github.com/SirDiabo/GithubLauncher).
 This fork is maintained by GitOpsGarage; it is not an upstream-endorsed release.
 The original MIT license and project attribution are preserved.
