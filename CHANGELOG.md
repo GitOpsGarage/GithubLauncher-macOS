@@ -3,7 +3,11 @@
 Changes in the GitOpsGarage-maintained macOS fork of SirDiabo/GithubLauncher.
 Upstream attribution and licenses are preserved; this fork is not endorsed by upstream.
 
-## [0.1.0-macos-preview.2] - 2026-10-17
+## [1.0.0] - 2026-10-17
+
+First stable launcher release, promoted after the maintainer reported successfully
+launching multiple games on macOS. Individual games retain their own requirements
+and compatibility status.
 
 ### Added
 
@@ -49,5 +53,5 @@ Upstream attribution and licenses are preserved; this fork is not endorsed by up
 - Direct CrossOver and Steam / NotProton launch configuration, original game data
   guidance and startup diagnostics.
 
-[0.1.0-macos-preview.2]: https://github.com/GitOpsGarage/GithubLauncher-macOS/compare/v0.1.0-macos-preview.1...v0.1.0-macos-preview.2
+[1.0.0]: https://github.com/GitOpsGarage/GithubLauncher-macOS/compare/v0.1.0-macos-preview.1...v1.0.0
 [0.1.0-macos-preview.1]: https://github.com/GitOpsGarage/GithubLauncher-macOS/releases/tag/v0.1.0-macos-preview.1

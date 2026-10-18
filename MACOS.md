@@ -19,7 +19,7 @@ Set `DOTNET_BIN` to an SDK executable path when it is not on PATH.
 `version.txt` supplies the app and assembly version. `MACOS_OUTPUT_ROOT` selects a
 separate build directory for release packaging. Set `MACOS_MIN_VERSION` to the
 minimum macOS version required by all bundled native libraries; the current Apple
-Silicon preview uses `26.0` because its SDL2 library was built for macOS Tahoe.
+Silicon release uses `26.0` because its SDL2 library was built for macOS Tahoe.
 The release ZIP includes the full self-contained app, changelog and MIT licenses.
 
 ## Find games for this Mac
